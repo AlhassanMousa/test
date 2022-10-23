@@ -1,0 +1,407 @@
+import React, { useState } from 'react';
+import {
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  PermissionsAndroid,
+  Button,
+  Image,
+  View,
+  button
+} from 'react-native';
+import { Card } from 'react-native-paper';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import axiosMobileApiInstance from '../../api/MobileInstance';
+import axios from 'axios';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import RNFetchBlob from 'rn-fetch-blob';
+import { COLORS } from '../../components/Styles';
+
+export default function AddDocs() {
+  const [id, setId] = useState('');
+  const [agricultureAssociation, setAgricultureAssociation] = useState('');
+  const [ownership, setOwnership] = useState('');
+  const [possession, setPossession] = useState('');
+  const [otherImage, setOtherImage] = useState('');
+
+  var options = {
+    mediaType: 'photo', //to allow only photo to select ...no video
+    saveToPhotos: true, //to store captured photo via camera to photos or else it will be stored in temp folders and will get deleted on temp clear
+    includeBase64: false,
+    maxWidth: 100,
+    maxHeight: 100,
+  };
+
+  const requestCameraPermission = async () => {
+    try {
+      const grantedcamera = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        {
+          title: 'App Camera Permission',
+          message: 'App needs access to your camera ',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        },
+      );
+      const grantedstorage = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+        {
+          title: 'App Camera Permission',
+          message: 'App needs access to your camera ',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        },
+      );
+      if (
+        grantedcamera === PermissionsAndroid.RESULTS.GRANTED &&
+        grantedstorage === PermissionsAndroid.RESULTS.GRANTED
+      ) {
+        console.log('Camera & storage permission given');
+
+        launchCamera(options, res => {
+          setImageOne(res.assets[0]);
+          console.log('>>> ', res.assets[0].uri);
+          if (res.didCancel) {
+            console.log('User cancelled image picker');
+          } else if (res.error) {
+            console.log('ImagePicker Error: ', res.error);
+          } else if (res.customButton) {
+            console.log('User tapped custom button: ', res.customButton);
+            alert(res.customButton);
+          } else {
+            /*
+                const source = { uri: res.uri };
+                console.log('response', JSON.stringify(res));
+                  console.log(JSON.stringify(res))
+                let source = res;
+                var resourcePath1 = source.assets[0].uri;
+                setChosenImage(resourcePath1);  */
+          }
+        });
+      } else {
+        console.log('Camera permission denied');
+      }
+    } catch (err) {
+      console.warn(err);
+    }
+  };
+
+  const selectImage = async () => {
+    launchImageLibrary(options, res => {
+      setImageOne(res);
+      if (res.didCancel) {
+        console.log('User cancelled image picker');
+      } else if (res.error) {
+        console.log('ImagePicker Error: ', res.error);
+      } else if (res.customButton) {
+        console.log('User tapped custom button: ', res.customButton);
+        alert(res.customButton);
+      } else {
+        /*
+      const source = { uri: res.uri };
+      console.log('response', JSON.stringify(res));
+        console.log(JSON.stringify(res))
+      let source = res;
+      var resourcePath1 = source.assets[0].uri;
+      setChosenImage(resourcePath1);  */
+      }
+    });
+  };
+  /*
+  const data = new FormData();
+  const data = new FormData();
+  data.append('file_attachment', ImageOne);
+*/
+  // console.log('1  ', ImageOne)
+
+  const uploadImage = async ImageOne => {
+    console.log(ImageOne);
+    const formData = {
+      files: {
+        name: ImageOne.fileName,
+        uri: ImageOne.uri,
+        type: ImageOne.type,
+      },
+      code: '123456',
+    };
+    const token = await AsyncStorage.getItem('token');
+
+    RNFetchBlob.fetch(
+      'POST',
+      'http://192.168.1.245:3002/client/initial/initialrequest',
+      {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        // this is required, otherwise it won't be process as a multipart/form-data request
+        'Content-Type': 'multipart/form-data',
+      },
+      [
+        // append field data from file path
+        {
+          name: ImageOne.fileName,
+          filename: 'mobile_team.jpg',
+          // Change BASE64 encoded data to a file path with prefix `RNFetchBlob-file://`.
+          // Or simply wrap the file path with RNFetchBlob.wrap().
+          data: RNFetchBlob.wrap(ImageOne.uri),
+        },
+        // elements without property `filename` will be sent as plain text
+        { name: 'code', data: '123' },
+      ],
+    )
+      .then(resp => {
+        console.log(resp);
+      })
+      .catch(err => {
+        console.log(err);
+      });
+
+    // const x = RNFetchBlob.fetch(
+    //   'POST',
+    //   'http://192.168.1.245:3002/client/initial/initialrequest',
+    //   {
+    //     Authorization: `Bearer ${token}`,
+    //     'Content-Type': 'application/octet-stream',
+    //   },
+    //   RNFetchBlob.wrap(ImageOne.uri),
+    // );
+
+    // console.log(x);
+    // //   formData.append('files', im);
+    // formData.append('code', '123456');
+    // const token = await AsyncStorage.getItem('token');
+    // console.log(JSON.stringify(formData));
+
+    // let ret = await RNFetchBlob.fetch(
+    //   'POST',
+    //   'http://192.168.1.245:3002/client/initial/initialrequest',
+    //   {
+    //     'Content-Type': 'multipart/form-data',
+    //   },
+    //   [
+    //     {
+    //       name: 'image',
+    //       filename: Date.now() + '.jpg',
+    //       type: 'image/jpg',
+    //       data: RNFetchBlob.wrap(ImageOne.uri),
+    //     },
+    //   ],
+    // );
+
+    // return ret;
+
+    // await axiosMobileApiInstance
+    //   .post('/client/initial/initialrequest', RNFetchBlob.wrap(ImageOne.uri), {
+    //     headers: {
+    //       //Authorization: `Bearer ${token}`,
+    //       'Content-Type': 'multipart/form-data',
+    //       //Accept: 'application/json',
+    //     },
+    //   })
+    //   .then(data => {
+    //     console.log(data);
+    //   })
+    //   .catch(error => {
+    //     console.log(error);
+    //   });
+  };
+
+
+ function handleSend(){
+  console.log('huh')
+ }
+
+ //style
+ const button = 'items-center self-center sp-2 bg-green rounded-xl mb-1 md:h-14 mb-3  mt-1 p-2 w-11/12';
+ const buttonText =
+   'text-fontL md:text-fontXL text-center text-white font-NeoSansArabicBold';
+
+   
+
+  return (
+    <ScrollView className="bg-generalBackground">
+    <Text className="text-fontXL md:text-fontXL text-center text-blackBlue mb-3  mt-1 p-2">تحميل صور الوثائق المطلوبة</Text>
+      <TouchableOpacity>
+      <View className="items-center self-center flex-row m-1 md:m-3 rounded-2xl bg-white p-3 w-11/12">
+      
+        <View className="shrink">
+          <Text className="text-fontL md:text-fontXL font-NeoSansArabic text-blackBlue ml-2 h-27">
+            Title
+          </Text>
+
+          <View className="flex-row justify-between ml-1 mr-2  w-full">
+            <Text className="flex-row text-fontS md:text-fontM text-color ml-2 text-right">
+              createdAt
+              <Icon name="calendar-month" color={COLORS.blackBlue} />
+            </Text>
+            <Text className="flex-row text-fontS md:text-fontM text-color ml-2 ">
+             Views <Icon name="eye-outline" color={COLORS.blackBlue} />
+            </Text>
+          </View>
+        </View>
+        <Image
+          className="h-16 md:h-36 w-16 md:w-36 rounded-tr-xl rounded-br-xl"
+          source={require('../../../assets/Docs/asso.png')}
+
+        />
+      </View>
+    </TouchableOpacity>
+
+
+{/************************************************************************/}
+<TouchableOpacity>
+      <View className="items-center self-center flex-row m-1 md:m-3 rounded-2xl bg-white p-3 w-11/12">
+        
+        <View className="shrink">
+          <Text className="text-fontL md:text-fontXL font-NeoSansArabic text-blackBlue ml-2 h-27">
+            Title
+          </Text>
+
+          <View className="flex-row justify-between ml-1 mr-2  w-full">
+            <Text className="flex-row text-fontS md:text-fontM text-color ml-2 text-right">
+              createdAt
+              <Icon name="calendar-month" color={COLORS.blackBlue} />
+            </Text>
+            <Text className="flex-row text-fontS md:text-fontM text-color ml-2 ">
+             Views <Icon name="eye-outline" color={COLORS.blackBlue} />
+            </Text>
+          </View>
+        </View>
+        <Image
+          className="h-16 md:h-36 w-16 md:w-36 rounded-tr-xl rounded-br-xl "
+          source={require('../../../assets/Docs/farm.png')}
+
+        />
+      </View>
+    </TouchableOpacity>
+
+    {/*******************************************************************/}
+    <TouchableOpacity>
+      <View className="items-center self-center flex-row m-1 md:m-3 rounded-2xl bg-white p-3 w-11/12">
+        
+        <View className="shrink">
+          <Text className="text-fontL md:text-fontXL font-NeoSansArabic text-blackBlue ml-2 h-27">
+            Title
+          </Text>
+
+          <View className="flex-row justify-between ml-1 mr-2  w-full">
+            <Text className="flex-row text-fontS md:text-fontM text-color ml-2 text-right">
+              createdAt
+              <Icon name="calendar-month" color={COLORS.blackBlue} />
+            </Text>
+            <Text className="flex-row text-fontS md:text-fontM text-color ml-2 ">
+             Views <Icon name="eye-outline" color={COLORS.blackBlue} />
+            </Text>
+          </View>
+        </View>
+        <Image
+          className="h-16 md:h-36 w-16 md:w-36 rounded-tr-xl rounded-br-xl "
+          source={require('../../../assets/Docs/owner.png')}
+
+        />
+      </View>
+    </TouchableOpacity>
+    {/************************************************************************/}
+    <TouchableOpacity>
+      <View className="items-center self-center flex-row m-1 md:m-3 rounded-2xl bg-white p-3 w-11/12">
+       
+        <View className="shrink">
+          <Text className="text-fontL md:text-fontXL font-NeoSansArabic text-blackBlue ml-2 h-27">
+            Title
+          </Text>
+
+          <View className="flex-row justify-between ml-1 mr-2  w-full">
+            <Text className="flex-row text-fontS md:text-fontM text-color ml-2 text-right">
+              createdAt
+              <Icon name="calendar-month" color={COLORS.blackBlue} />
+            </Text>
+            <Text className="flex-row text-fontS md:text-fontM text-color ml-2 ">
+             Views <Icon name="eye-outline" color={COLORS.blackBlue} />
+            </Text>
+          </View>
+        </View>
+        <Image
+          className="h-16 md:h-36 w-16 md:w-36 rounded-tr-xl rounded-br-xl "
+          source={require('../../../assets/Docs/id.png')}
+
+        />
+      </View>
+    </TouchableOpacity>
+{/***********************************************************************/}
+ <TouchableOpacity>
+      <View className="items-center self-center flex-row m-1 md:m-3 rounded-2xl bg-white p-3 w-11/12">
+       
+        <View className="shrink">
+          <Text className="text-fontL md:text-fontXL font-NeoSansArabic text-blackBlue ml-2 h-27">
+            Title
+          </Text>
+
+          <View className="flex-row justify-between ml-1 mr-2  w-full">
+            <Text className="flex-row text-fontS md:text-fontM text-color ml-2 text-right">
+              createdAt
+              <Icon name="calendar-month" color={COLORS.blackBlue} />
+            </Text>
+            <Text className="flex-row text-fontS md:text-fontM text-color ml-2 ">
+             Views <Icon name="eye-outline" color={COLORS.blackBlue} />
+            </Text>
+          </View>
+        </View>
+        <Image
+          className="h-16 md:h-36 w-16 md:w-36 rounded-tr-xl rounded-br-xl "
+          source={require('../../../assets/Docs/image.png')}
+
+        />
+      </View>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+          disabled={true}
+          className={button}
+          onPress={() => {
+            handleSend();
+          }}>
+          <Text className={buttonText}>إرسال</Text>
+        </TouchableOpacity>
+
+
+    </ScrollView>
+  );
+}
+
+
+
+/*
+ <Card className="w-100 mt-20  p-3 mb-3">
+        <Image
+          style={{ width: 50, height: 50 }}
+          source={{
+            uri: `${ImageOne.uri}`,
+          }}
+        />
+        <TouchableOpacity
+          className="p-2 bg-green rounded-xl mb-1 h-11 md:h-12"
+          onPress={requestCameraPermission}>
+          <Text className="text-fontL md:text-fontXL text-center text-white font-NeoSansArabicBold">
+            إلتقط من الكاميرا
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          className="p-2 bg-green rounded-xl mb-1 h-11 md:h-12"
+          onPress={selectImage}>
+          <Text className="text-fontL md:text-fontXL text-center text-white font-NeoSansArabicBold">
+            إختر من الاستديو
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          className="p-2 bg-blackBlue rounded-xl mb-1 h-11 md:h-12"
+          onPress={() => uploadImage(ImageOne)}>
+          <Text className="text-fontL md:text-fontXL text-center text-white font-NeoSansArabicBold">
+            تحميل
+          </Text>
+        </TouchableOpacity>
+ \ </Card>
+*/
